@@ -52,9 +52,11 @@ func ExampleBroadcast() {
 	fmt.Println("subscription 2 got", <-notify2)
 	b.Update("5th update")
 	fmt.Println("subscription 1 got", <-notify1)
+	fmt.Println("subscription 2 got", <-notify2)
 
 	// Output:
 	// subscription 1 got 3rd update
 	// subscription 2 got 4th update
 	// subscription 1 got 5th update
+	// subscription 2 got 5th update
 }

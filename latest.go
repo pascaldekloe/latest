@@ -40,8 +40,10 @@ func NewFeed(notify chan<- interface{}) chan<- interface{} {
 	return update
 }
 
-// Broadcast offers a publish–subscribe for update notification.
-// All methods from Broadcast are thread-safe and non-blocking.
+// Broadcast offers a publish–subscribe for update notification. Each subscriber
+// has it's own isolated update process. Slow receivals do not block operation.
+// Instead, the notification continues with the latest value, discarding all
+// pending [unused] updates. All methods may be called concurrently.
 type Broadcast struct {
 	sync.RWMutex // subscription lock
 	feeds        map[chan<- interface{}]chan<- interface{}
