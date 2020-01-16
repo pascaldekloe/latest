@@ -49,6 +49,15 @@ type Broadcast struct {
 	feeds        map[chan<- interface{}]chan<- interface{}
 }
 
+// Check if there's no subscriber alive
+func (b *Broadcast) Idle() bool {
+
+	b.RLock()
+	defer b.RUnlock()
+
+	return len(b.feeds) == 0
+}
+
 // Update sets the current version.
 func (b *Broadcast) Update(v interface{}) {
 	b.RLock()
