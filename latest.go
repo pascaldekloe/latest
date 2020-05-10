@@ -1,13 +1,14 @@
-// Package latest provides safe ways to keep track of a current version.
+// Package latest provides ways to keep track of a current version.
 package latest
 
 import "sync"
 
-// NewFeed starts a notification routine and returns an update input channel.
-// A close on the input channel terminates the processing; notify stays open.
-// Slow acceptance on notify does not block input. Instead, the notification
-// continues with the latest value, discarding all pending [unused] updates.
-// Be careful with buffered channels as they interfear with data freshness.
+// NewFeed returns a non-blocking input channel for notify.
+// The notification process uses the latest input only. Any
+// pending [undelivered] submissions are freely discarded.
+// Processing terminates when the input channel is closed.
+// Be careful with buffered channels as they interfear with
+// data freshness.
 func NewFeed(notify chan<- interface{}) chan<- interface{} {
 	feed := make(chan interface{})
 
@@ -34,10 +35,10 @@ func NewFeed(notify chan<- interface{}) chan<- interface{} {
 	return feed
 }
 
-// Broadcast offers a publish–subscribe for update notification. Each subscriber
-// has it's own isolated update process. Slow receivals do not block operation.
-// Instead, the notification continues with the latest value, discarding all
-// pending [unused] updates. All methods may be called concurrently.
+// Broadcast enqueues the latest Update (publication) for each subscriber
+// individually. Slow subscribers do not block Update submission. Instead,
+// any pending [undelivered] publications are replaced with the latest.
+// Multiple goroutines may invoke methods on a Broadcast simultaneously.
 type Broadcast struct {
 	sync.RWMutex // subscription lock
 	feeds        map[chan<- interface{}]chan<- interface{}
@@ -96,7 +97,7 @@ func (b *Broadcast) UnsubscribeAll() {
 	}
 }
 
-// SubscriptionCount returns the number of broadcast channels.
+// SubscriptionCount returns the number of active subscriptions.
 func (b *Broadcast) SubscriptionCount() int {
 	b.RLock()
 	defer b.RUnlock()
