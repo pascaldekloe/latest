@@ -9,35 +9,29 @@ import "sync"
 // continues with the latest value, discarding all pending [unused] updates.
 // Be careful with buffered channels as they interfear with data freshness.
 func NewFeed(notify chan<- interface{}) chan<- interface{} {
-	update := make(chan interface{})
+	feed := make(chan interface{})
 
 	go func() {
 		for {
 			// await update
-			latest, ok := <-update
-			if !ok {
-				return
-			}
-
-		Notify:
+			latest, ok := <-feed
 			for {
-				select {
-				case notify <- latest:
-					// passed the update
-					break Notify
-
-				case v, ok := <-update:
-					if !ok {
-						return
-					}
-					// replace the update with a newer one
-					latest = v
+				if !ok {
+					return
 				}
+				select {
+				case latest, ok = <-feed:
+					continue // newer update
+
+				case notify <- latest:
+					break // update delivered
+				}
+				break
 			}
 		}
 	}()
 
-	return update
+	return feed
 }
 
 // Broadcast offers a publish–subscribe for update notification. Each subscriber
@@ -54,28 +48,29 @@ func (b *Broadcast) Update(v interface{}) {
 	b.RLock()
 	defer b.RUnlock()
 
-	for _, update := range b.feeds {
-		update <- v
+	for _, feed := range b.feeds {
+		feed <- v
 	}
 }
 
 // Subscribe adds an update receiver.
+// Duplicate subscriptions are ignored.
 func (b *Broadcast) Subscribe(notify chan<- interface{}) {
-	update := NewFeed(notify)
+	feed := NewFeed(notify)
 
 	b.Lock()
 	defer b.Unlock()
 
 	if _, ok := b.feeds[notify]; ok {
 		// already subscribed
-		close(update)
+		close(feed)
 		return
 	}
 
 	if b.feeds == nil {
 		b.feeds = make(map[chan<- interface{}]chan<- interface{})
 	}
-	b.feeds[notify] = update
+	b.feeds[notify] = feed
 }
 
 // Unsubscribe terminates a subscription.
@@ -83,10 +78,10 @@ func (b *Broadcast) Unsubscribe(notify chan<- interface{}) {
 	b.Lock()
 	defer b.Unlock()
 
-	update, ok := b.feeds[notify]
+	feed, ok := b.feeds[notify]
 	if ok {
 		delete(b.feeds, notify)
-		close(update)
+		close(feed)
 	}
 }
 
@@ -95,9 +90,9 @@ func (b *Broadcast) UnsubscribeAll() {
 	b.Lock()
 	defer b.Unlock()
 
-	for notify, update := range b.feeds {
+	for notify, feed := range b.feeds {
 		delete(b.feeds, notify)
-		close(update)
+		close(feed)
 	}
 }
 
